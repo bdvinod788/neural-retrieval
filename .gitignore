@@ -1,0 +1,35 @@
+# Model weights and checkpoints
+checkpoint/
+checkpoint_*/
+*.swp
+*.swo
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# Data and indexes
+data/
+indexes/
+embeddings/
+runs/
+*.jsonl
+*.parquet
+*.npy
+*.faiss
+
+# Logs
+logs/
+wandb/
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Environment
+.env
+*.egg-info/
+
+# NOTE: results/ and plots/ are deliberately tracked. The reward-model repo
+# gitignores outputs/, so a fresh clone contains no numbers. Not repeating that.
