@@ -45,7 +45,9 @@ def bm25_search():
             [queries[q] for q in batch], batch, k=args.top_k, threads=args.threads
         )
         for qid in batch:
-            run[qid] = [(h.docid, h.score) for h in hits[qid]]
+            run[qid] = [
+                (h.docid, h.score) for h in hits[qid] if h.docid != qid
+            ]
 
     return run
 
