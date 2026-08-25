@@ -28,6 +28,8 @@ _, queries, _ = load_beir(
 
 
 def bm25_search():
+    os.environ.setdefault("OPENAI_API_KEY", "unused")
+
     from pyserini.search.lucene import LuceneSearcher
 
     searcher = LuceneSearcher(os.path.join(project, "indexes", "bm25", args.dataset))
