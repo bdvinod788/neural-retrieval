@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --account=jonmay_1426
+#SBATCH --partition=main
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64GB
+#SBATCH --time=04:00:00
+#SBATCH --job-name=nr-bm25-gate
+#SBATCH --output=/scratch1/bandrede/neural-retrieval/logs/%j.out
+#SBATCH --error=/scratch1/bandrede/neural-retrieval/logs/%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=bdvinod788@gmail.com
+
+module purge
+module load conda
+source activate /scratch1/bandrede/envs/neural-retrieval
+
+export HF_HOME=/scratch1/bandrede/hf_cache
+export NR_PROJECT=/scratch1/bandrede/neural-retrieval
+
+cd $NR_PROJECT
+
+# Week 1. Download BEIR, build the Lucene indexes, score BM25, check the gate.
+# CPU only -- BM25 needs no GPU.
+PYTHON=/scratch1/bandrede/envs/neural-retrieval/bin/python
+
+$PYTHON src/download_data.py
+$PYTHON src/build_bm25_index.py
+
+for DS in scifact nfcorpus arguana scidocs fiqa trec-covid; do
+    $PYTHON src/run_retrieval.py --arm bm25 --dataset $DS
+    $PYTHON src/evaluate.py \
+        --run $NR_PROJECT/runs/bm25_${DS}.trec \
+        --arm bm25 --dataset $DS \
+        --output results/bm25/${DS}.json
+done
+
+# Exits non-zero if any dataset is more than ~1 nDCG@10 point off published.
+$PYTHON notebooks/bm25_gate.py
