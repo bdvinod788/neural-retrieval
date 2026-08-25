@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import subprocess
 
@@ -43,7 +44,7 @@ for dataset in args.datasets:
 
     subprocess.run(
         [
-            "python", "-m", "pyserini.index.lucene",
+            sys.executable, "-m", "pyserini.index.lucene",
             "--collection", "JsonCollection",
             "--input", jsonl_dir,
             "--index", index_dir,

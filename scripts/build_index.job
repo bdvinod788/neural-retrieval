@@ -12,17 +12,22 @@
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=bdvinod788@gmail.com
 
+set -e -o pipefail
+
 module purge
 module load conda
 source activate /scratch1/bandrede/envs/neural-retrieval
 
 export HF_HOME=/scratch1/bandrede/hf_cache
+export TRANSFORMERS_CACHE=/scratch1/bandrede/hf_cache
+export TMPDIR=/scratch1/bandrede/tmp
 export NR_PROJECT=/scratch1/bandrede/neural-retrieval
+mkdir -p $TMPDIR
+
+ulimit -n 65536
 
 cd $NR_PROJECT
 
-# Week 1. Download BEIR, build the Lucene indexes, score BM25, check the gate.
-# CPU only -- BM25 needs no GPU.
 PYTHON=/scratch1/bandrede/envs/neural-retrieval/bin/python
 
 $PYTHON src/download_data.py
@@ -36,5 +41,4 @@ for DS in scifact nfcorpus arguana scidocs fiqa trec-covid; do
         --output results/bm25/${DS}.json
 done
 
-# Exits non-zero if any dataset is more than ~1 nDCG@10 point off published.
 $PYTHON notebooks/bm25_gate.py
