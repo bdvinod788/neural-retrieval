@@ -1,20 +1,20 @@
 import os
 import json
 
+from torch.utils.data import Dataset
 
-def load_tsv(path):
-    # Two-column TSV: id -> text. Used for collection.tsv and queries.*.tsv.
+
+def load_tsv(path, keep=None):
     out = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
             key, value = line.rstrip("\n").split("\t", 1)
-            out[key] = value
+            if keep is None or key in keep:
+                out[key] = value
     return out
 
 
 def load_qrels(path):
-    # Handles both TREC 4-column qrels and BEIR 3-column TSV, which ships with
-    # a "query-id corpus-id score" header row.
     qrels = {}
     with open(path, encoding="utf-8") as f:
         for line in f:
@@ -32,8 +32,6 @@ def load_qrels(path):
 
 
 def load_beir(dataset, split="test", data_dir=None):
-    # Returns (corpus, queries, qrels) for a BEIR dataset already downloaded
-    # into $NR_PROJECT/data/beir/<dataset>/.
     data_dir = data_dir or os.path.join(
         os.environ.get("NR_PROJECT", "."), "data", "beir", dataset
     )
@@ -57,8 +55,57 @@ def load_beir(dataset, split="test", data_dir=None):
 
 
 def write_jsonl_corpus(corpus, out_dir):
-    # Pyserini's JsonCollection wants {"id": ..., "contents": ...} per line.
     os.makedirs(out_dir, exist_ok=True)
     with open(os.path.join(out_dir, "docs.jsonl"), "w", encoding="utf-8") as f:
         for docid, text in corpus.items():
             f.write(json.dumps({"id": docid, "contents": text}) + "\n")
+
+
+def load_msmarco_pairs(qrels_path):
+    qrels = load_qrels(qrels_path)
+    return [
+        (qid, pid)
+        for qid, docs in qrels.items()
+        for pid, rel in docs.items()
+        if rel > 0
+    ]
+
+
+class TripleDataset(Dataset):
+    def __init__(self, rows, queries, collection):
+        self.rows = rows
+        self.queries = queries
+        self.collection = collection
+
+    def __len__(self):
+        return len(self.rows)
+
+    def __getitem__(self, idx):
+        row = self.rows[idx]
+        item = {
+            "query": self.queries[row[0]],
+            "positive": self.collection[row[1]],
+        }
+        if len(row) > 2:
+            item["negative"] = self.collection[row[2]]
+        return item
+
+
+def make_biencoder_collator(tokenizer, max_query_len=32, max_passage_len=128):
+    def collate(batch):
+        queries = tokenizer(
+            [b["query"] for b in batch],
+            padding=True, truncation=True, max_length=max_query_len,
+            return_tensors="pt",
+        )
+        passages = [b["positive"] for b in batch]
+        if "negative" in batch[0]:
+            passages += [b["negative"] for b in batch]
+        passages = tokenizer(
+            passages,
+            padding=True, truncation=True, max_length=max_passage_len,
+            return_tensors="pt",
+        )
+        return {"queries": dict(queries), "passages": dict(passages)}
+
+    return collate

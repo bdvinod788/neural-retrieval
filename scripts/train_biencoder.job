@@ -1,0 +1,40 @@
+#!/bin/bash
+#SBATCH --account=jonmay_1426
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-task=a100:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64GB
+#SBATCH --time=24:00:00
+#SBATCH --job-name=nr-biencoder
+#SBATCH --output=/scratch1/bandrede/neural-retrieval/logs/%j.out
+#SBATCH --error=/scratch1/bandrede/neural-retrieval/logs/%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=bdvinod788@gmail.com
+
+module purge
+module load conda
+source activate /scratch1/bandrede/envs/neural-retrieval
+
+export PYTHONNOUSERSITE=1
+
+export HF_HOME=/scratch1/bandrede/hf_cache
+export HF_DATASETS_CACHE=/scratch1/bandrede/datasets
+export NR_PROJECT=/scratch1/bandrede/neural-retrieval
+
+cd $NR_PROJECT
+
+PYTHON=/scratch1/bandrede/envs/neural-retrieval/bin/python
+
+CKPT_DIR=$NR_PROJECT/checkpoint_biencoder_in_batch
+echo "Output dir: $CKPT_DIR"
+
+LATEST=$(ls -d $CKPT_DIR/checkpoint-* 2>/dev/null | sort -V | tail -1)
+if [ -z "$LATEST" ]; then
+    echo "Starting from scratch"
+    $PYTHON src/train_biencoder.py --negatives in_batch
+else
+    echo "Resuming from $LATEST"
+    $PYTHON src/train_biencoder.py --negatives in_batch --resume $LATEST
+fi
