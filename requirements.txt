@@ -2,6 +2,6 @@ pyserini==0.36.0
 ir_measures==0.3.3
 numpy==1.26.4
 faiss-cpu==1.8.0
-torch
-transformers
+torch==2.13.0
+transformers==5.15.1
 accelerate

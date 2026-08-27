@@ -1,6 +1,8 @@
 import os
+import math
 import argparse
 
+import torch
 from transformers import AutoTokenizer, Trainer, TrainingArguments
 
 from models import BiEncoder
@@ -49,6 +51,18 @@ model.encoder.gradient_checkpointing_enable()
 dataset = TripleDataset(pairs, queries, collection)
 
 
+if args.max_steps > 0:
+    total_steps = args.max_steps
+else:
+    steps_per_epoch = math.ceil(len(dataset) / args.batch_size)
+    total_steps = steps_per_epoch * args.epochs
+warmup_steps = int(args.warmup_ratio * total_steps)
+print(f"{total_steps} total steps, {warmup_steps} warmup")
+
+use_bf16 = torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+print(f"precision: {'bf16' if use_bf16 else 'fp16'}")
+
+
 class BiEncoderTrainer(Trainer):
     def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
         loss = model(queries=inputs["queries"], passages=inputs["passages"])
@@ -60,10 +74,11 @@ config = TrainingArguments(
     num_train_epochs=args.epochs,
     per_device_train_batch_size=args.batch_size,
     learning_rate=args.learning_rate,
-    warmup_ratio=args.warmup_ratio,
+    warmup_steps=warmup_steps,
     lr_scheduler_type="linear",
     max_steps=args.max_steps,
-    bf16=True,
+    bf16=use_bf16,
+    fp16=not use_bf16,
     seed=args.seed,
     data_seed=args.seed,
     dataloader_num_workers=4,
