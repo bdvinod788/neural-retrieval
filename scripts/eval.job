@@ -1,0 +1,56 @@
+#!/bin/bash
+#SBATCH --account=jonmay_1426
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-task=a100:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64GB
+#SBATCH --time=04:00:00
+#SBATCH --job-name=nr-eval
+#SBATCH --output=/scratch1/bandrede/neural-retrieval/logs/%j.out
+#SBATCH --error=/scratch1/bandrede/neural-retrieval/logs/%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=bdvinod788@gmail.com
+
+module purge
+module load conda
+source activate /scratch1/bandrede/envs/neural-retrieval
+
+export PYTHONNOUSERSITE=1
+
+export HF_HOME=/scratch1/bandrede/hf_cache
+export HF_DATASETS_CACHE=/scratch1/bandrede/datasets
+export NR_PROJECT=/scratch1/bandrede/neural-retrieval
+
+cd $NR_PROJECT
+
+PYTHON=/scratch1/bandrede/envs/neural-retrieval/bin/python
+
+ARM=${ARM:-dense}
+CKPT=$NR_PROJECT/checkpoint_biencoder_in_batch
+
+case $ARM in
+    dense)
+        NAME=dense_v1
+        RETRIEVE_ARGS="--checkpoint $CKPT"
+        SCORE_ARGS="--model bert-base-uncased --checkpoint $CKPT"
+        ;;
+    bm25)
+        NAME=bm25
+        RETRIEVE_ARGS=""
+        SCORE_ARGS="--model bm25"
+        ;;
+    *) echo "FATAL: unknown ARM=$ARM"; exit 1 ;;
+esac
+
+for DS in scifact nfcorpus arguana scidocs fiqa trec-covid; do
+    $PYTHON src/run_retrieval.py --arm $ARM --dataset $DS \
+        --output $NR_PROJECT/runs/${NAME}_${DS}.trec $RETRIEVE_ARGS
+    $PYTHON src/evaluate.py \
+        --run $NR_PROJECT/runs/${NAME}_${DS}.trec \
+        --arm $NAME --dataset $DS $SCORE_ARGS \
+        --output results/${NAME}/${DS}.json
+done
+
+$PYTHON notebooks/dense_vs_bm25.py
