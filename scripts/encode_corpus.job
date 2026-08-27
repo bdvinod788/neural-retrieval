@@ -1,0 +1,45 @@
+#!/bin/bash
+#SBATCH --account=jonmay_1426
+#SBATCH --partition=gpu
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-task=a100:1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=64GB
+#SBATCH --time=12:00:00
+#SBATCH --job-name=nr-encode
+#SBATCH --output=/scratch1/bandrede/neural-retrieval/logs/%j.out
+#SBATCH --error=/scratch1/bandrede/neural-retrieval/logs/%j.err
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=bdvinod788@gmail.com
+
+module purge
+module load conda
+source activate /scratch1/bandrede/envs/neural-retrieval
+
+export PYTHONNOUSERSITE=1
+
+export HF_HOME=/scratch1/bandrede/hf_cache
+export HF_DATASETS_CACHE=/scratch1/bandrede/datasets
+export NR_PROJECT=/scratch1/bandrede/neural-retrieval
+
+cd $NR_PROJECT
+
+PYTHON=/scratch1/bandrede/envs/neural-retrieval/bin/python
+
+CKPT=$NR_PROJECT/checkpoint_biencoder_in_batch
+if [ ! -d "$CKPT" ]; then
+    echo "FATAL: $CKPT not found. Run train_biencoder.job first."
+    exit 1
+fi
+
+if [ -n "$DATASET" ]; then
+    TARGETS="$DATASET"
+else
+    TARGETS="scifact nfcorpus arguana scidocs fiqa trec-covid"
+fi
+
+for DS in $TARGETS; do
+    echo "=== $DS ==="
+    $PYTHON src/encode_corpus.py --checkpoint $CKPT --dataset $DS
+done

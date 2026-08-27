@@ -4,4 +4,4 @@ numpy==1.26.4
 faiss-cpu==1.8.0
 torch==2.13.0
 transformers==5.15.1
-accelerate
+accelerate==1.14.0
